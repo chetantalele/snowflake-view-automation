@@ -1,6 +1,12 @@
 import snowflake.connector
 import yaml
 import os
+import reprlib
+
+account = os.getenv("SNOWFLAKE_ACCOUNT")
+
+print("RAW ACCOUNT VALUE:", repr(account))
+
 
 conn = snowflake.connector.connect(
     account=os.getenv("SNOWFLAKE_ACCOUNT"),
