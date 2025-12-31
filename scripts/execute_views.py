@@ -1,20 +1,20 @@
 import snowflake.connector
 import yaml
 import os
-import reprlib
 
-account = os.getenv("SNOWFLAKE_ACCOUNT")
-
-print("RAW ACCOUNT VALUE:", repr(account))
-
+def env(name):
+    value = os.getenv(name)
+    if not value:
+        raise Exception(f"Missing environment variable: {name}")
+    return value.strip().replace("\n", "").replace("\r", "")
 
 conn = snowflake.connector.connect(
-    account="mx71933.me-central2.gcp",        # hardcoded
-    user="VIEW_AUTOMATION_USER",              # hardcoded
-    password="TempPassword@123",              # hardcoded
-    role="VIEW_AUTOMATION_ROLE",               # hardcoded
-    warehouse="TEST_WH",                      # hardcoded
-    database="TEST_DB"                        # hardcoded
+    account=env("SNOWFLAKE_ACCOUNT"),
+    user=env("SNOWFLAKE_USER"),
+    password=env("SNOWFLAKE_PASSWORD"),
+    role=env("SNOWFLAKE_ROLE"),
+    warehouse=env("SNOWFLAKE_WAREHOUSE"),
+    database=env("SNOWFLAKE_DATABASE")
 )
 
 cursor = conn.cursor()
@@ -26,7 +26,6 @@ for file in os.listdir("view_requests"):
     with open(f"view_requests/{file}") as f:
         data = yaml.safe_load(f)
 
-    # 1️⃣ Check if mapping already exists (FIXED)
     cursor.execute(f"""
         SELECT COUNT(*)
         FROM TEST_DB.TEST_SCH.MAP_RAW
@@ -39,7 +38,6 @@ for file in os.listdir("view_requests"):
 
     exists = cursor.fetchone()[0]
 
-    # 2️⃣ Insert + create view only if not exists
     if exists == 0:
         cursor.execute(f"""
             INSERT INTO TEST_DB.TEST_SCH.MAP_RAW
