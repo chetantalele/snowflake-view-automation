@@ -9,12 +9,12 @@ print("RAW ACCOUNT VALUE:", repr(account))
 
 
 conn = snowflake.connector.connect(
-    account="mx71933.me-central2.gcp",
-    user=os.getenv("SNOWFLAKE_USER"),
-    password=os.getenv("SNOWFLAKE_PASSWORD"),
-    role=os.getenv("SNOWFLAKE_ROLE"),
-    warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-    database=os.getenv("SNOWFLAKE_DATABASE")
+    account="mx71933.me-central2.gcp",        # hardcoded
+    user="VIEW_AUTOMATION_USER",              # hardcoded
+    password="TempPassword@123",              # hardcoded
+    role="VIEW_AUTOMATION_ROLE",               # hardcoded
+    warehouse="TEST_WH",                      # hardcoded
+    database="TEST_DB"                        # hardcoded
 )
 
 cursor = conn.cursor()
