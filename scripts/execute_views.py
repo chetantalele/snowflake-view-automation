@@ -9,7 +9,7 @@ print("RAW ACCOUNT VALUE:", repr(account))
 
 
 conn = snowflake.connector.connect(
-    account=os.getenv("SNOWFLAKE_ACCOUNT"),
+    account="mx71933.me-central2.gcp",
     user=os.getenv("SNOWFLAKE_USER"),
     password=os.getenv("SNOWFLAKE_PASSWORD"),
     role=os.getenv("SNOWFLAKE_ROLE"),
