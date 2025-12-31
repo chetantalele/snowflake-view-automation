@@ -22,11 +22,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Execute Snowflake View Automation
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-        run: python scripts/execute_views.py
+        shell: bash
+        run: |
+          export SNOWFLAKE_ACCOUNT="$(printf '%s' "${{ secrets.SNOWFLAKE_ACCOUNT }}")"
+          export SNOWFLAKE_USER="$(printf '%s' "${{ secrets.SNOWFLAKE_USER }}")"
+          export SNOWFLAKE_PASSWORD="$(printf '%s' "${{ secrets.SNOWFLAKE_PASSWORD }}")"
+          export SNOWFLAKE_ROLE="$(printf '%s' "${{ secrets.SNOWFLAKE_ROLE }}")"
+          export SNOWFLAKE_WAREHOUSE="$(printf '%s' "${{ secrets.SNOWFLAKE_WAREHOUSE }}")"
+          export SNOWFLAKE_DATABASE="$(printf '%s' "${{ secrets.SNOWFLAKE_DATABASE }}")"
+
+          python scripts/execute_views.py
+
