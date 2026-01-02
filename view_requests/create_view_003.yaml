@@ -1,5 +1,0 @@
-src_db: SOURCE_DB
-src_sch: RAW
-src_table: ORDERS_DATA_1
-tgt_db: TEST_DB
-tgt_sch: TEST_SCH
