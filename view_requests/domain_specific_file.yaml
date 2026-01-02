@@ -6,4 +6,5 @@ defaults:
 
 tables:
   ORDERS_DATA: {}
+  ORDERS: {}
 
