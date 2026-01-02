@@ -21,9 +21,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Get newly added view request files
+        id: new_files
+        run: |
+          git fetch origin main
+          NEW_FILES=$(git diff --name-only --diff-filter=A origin/main...HEAD | grep '^view_requests/.*\.yaml' || true)
+          echo "NEW_FILES<<EOF" >> $GITHUB_ENV
+          echo "$NEW_FILES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       - name: Execute Snowflake View Automation
         shell: bash
         run: |
+          if [ -z "$NEW_FILES" ]; then
+            echo "No new view request files found. Skipping execution."
+            exit 0
+          fi
+
           export SNOWFLAKE_ACCOUNT="$(printf '%s' "${{ secrets.SNOWFLAKE_ACCOUNT }}")"
           export SNOWFLAKE_USER="$(printf '%s' "${{ secrets.SNOWFLAKE_USER }}")"
           export SNOWFLAKE_PASSWORD="$(printf '%s' "${{ secrets.SNOWFLAKE_PASSWORD }}")"
@@ -31,5 +45,10 @@ jobs:
           export SNOWFLAKE_WAREHOUSE="$(printf '%s' "${{ secrets.SNOWFLAKE_WAREHOUSE }}")"
           export SNOWFLAKE_DATABASE="$(printf '%s' "${{ secrets.SNOWFLAKE_DATABASE }}")"
 
-          python scripts/execute_views.py
+          python scripts/execute_views.py "$NEW_FILES"
+
+
+
+     
+
 
