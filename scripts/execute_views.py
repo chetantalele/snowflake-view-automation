@@ -1,29 +1,29 @@
+import sys
 import snowflake.connector
 import yaml
 import os
 
-def env(name):
-    value = os.getenv(name)
-    if not value:
-        raise Exception(f"Missing environment variable: {name}")
-    return value.strip().replace("\n", "").replace("\r", "")
+files_to_process = sys.argv[1:]
+
+if not files_to_process:
+    print("No new YAML files to process.")
+    exit(0)
 
 conn = snowflake.connector.connect(
-    account=env("SNOWFLAKE_ACCOUNT"),
-    user=env("SNOWFLAKE_USER"),
-    password=env("SNOWFLAKE_PASSWORD"),
-    role=env("SNOWFLAKE_ROLE"),
-    warehouse=env("SNOWFLAKE_WAREHOUSE"),
-    database=env("SNOWFLAKE_DATABASE")
+    account=os.getenv("SNOWFLAKE_ACCOUNT"),
+    user=os.getenv("SNOWFLAKE_USER"),
+    password=os.getenv("SNOWFLAKE_PASSWORD"),
+    role=os.getenv("SNOWFLAKE_ROLE"),
+    warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
+    database=os.getenv("SNOWFLAKE_DATABASE")
 )
 
 cursor = conn.cursor()
 
-for file in os.listdir("view_requests"):
-    if not file.endswith(".yaml"):
-        continue
+for file in files_to_process:
+    print(f"Processing new file: {file}")
 
-    with open(f"view_requests/{file}") as f:
+    with open(file) as f:
         data = yaml.safe_load(f)
 
     cursor.execute(f"""
@@ -57,6 +57,8 @@ for file in os.listdir("view_requests"):
                 '{data['tgt_sch']}'
             )
         """)
+    else:
+        print("Mapping already exists. Skipping.")
 
 cursor.close()
 conn.close()
