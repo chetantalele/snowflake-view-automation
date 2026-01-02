@@ -10,25 +10,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️ Checkout full git history (MANDATORY for git diff)
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      # 2️ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
+      # 3️ Install dependencies
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # 4️ Detect newly added YAML files
       - name: Get newly added view request files
+        shell: bash
         run: |
-          NEW_FILES=$(git diff --name-only --diff-filter=A ${{ github.event.before }} ${{ github.sha }} | grep '^view_requests/.*\.yaml' || true)
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "First commit or force push detected."
+            NEW_FILES=$(ls view_requests/*.yaml 2>/dev/null || true)
+          else
+            NEW_FILES=$(git diff --name-only --diff-filter=A "$BEFORE" "$AFTER" | grep '^view_requests/.*\.yaml' || true)
+          fi
+
           echo "NEW_FILES<<EOF" >> $GITHUB_ENV
           echo "$NEW_FILES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-
+      # 5️ Execute Snowflake automation only if new files exist
       - name: Execute Snowflake View Automation
         shell: bash
         run: |
@@ -44,10 +60,7 @@ jobs:
           export SNOWFLAKE_WAREHOUSE="$(printf '%s' "${{ secrets.SNOWFLAKE_WAREHOUSE }}")"
           export SNOWFLAKE_DATABASE="$(printf '%s' "${{ secrets.SNOWFLAKE_DATABASE }}")"
 
-          python scripts/execute_views.py "$NEW_FILES"
+          echo "Processing new files:"
+          echo "$NEW_FILES"
 
-
-
-     
-
-
+          python scripts/execute_views.py $NEW_FILES
