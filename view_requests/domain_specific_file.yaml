@@ -1,0 +1,9 @@
+defaults:
+  src_db: SOURCE_DB
+  src_sch: RAW
+  tgt_db: TEST_DB
+  tgt_sch: TEST_SCH
+
+tables:
+  ORDERS_DATA: {}
+
