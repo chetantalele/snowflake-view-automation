@@ -22,13 +22,12 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Get newly added view request files
-        id: new_files
         run: |
-          git fetch origin main
-          NEW_FILES=$(git diff --name-only --diff-filter=A origin/main...HEAD | grep '^view_requests/.*\.yaml' || true)
+          NEW_FILES=$(git diff --name-only --diff-filter=A ${{ github.event.before }} ${{ github.sha }} | grep '^view_requests/.*\.yaml' || true)
           echo "NEW_FILES<<EOF" >> $GITHUB_ENV
           echo "$NEW_FILES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
+
 
       - name: Execute Snowflake View Automation
         shell: bash
