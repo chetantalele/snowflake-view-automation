@@ -100,7 +100,7 @@ for file in files_to_process:
         continue
 
     data = yaml.safe_load(new_content)
-    defaults = data.get("defaults", {})   # 🔑 DEFAULTS OPTIONAL
+    defaults = data.get("defaults", {})   #  DEFAULTS OPTIONAL
     tables = data.get("tables", {})
 
     for table in added_tables:
@@ -134,10 +134,10 @@ for file in files_to_process:
                 )
             """)
 
-            print("  ✅ View created successfully")
+            print("   View created successfully")
 
         except Exception as e:
-            print(f"  ❌ View creation failed: {e}")
+            print(f"   View creation failed: {e}")
             print("  Rolling back metadata")
 
             meta_cursor.execute(f"""
