@@ -4,6 +4,9 @@ import yaml
 import subprocess
 import snowflake.connector
 
+# ----------------------------------------------------
+# Inputs
+# ----------------------------------------------------
 files_to_process = sys.argv[1:]
 if not files_to_process:
     print("No changed YAML files to process.")
@@ -20,6 +23,7 @@ def load_tables(content):
     data = yaml.safe_load(content) or {}
     return set(data.get("tables", {}).keys())
 
+
 def get_old_content(file):
     if not GIT_BEFORE or GIT_BEFORE.startswith("000000"):
         return ""
@@ -31,16 +35,32 @@ def get_old_content(file):
     except subprocess.CalledProcessError:
         return ""
 
-def resolve(defaults, overrides):
-    return {
+
+def resolve(defaults: dict, overrides: dict, table_name: str) -> dict:
+    """
+    Resolution rule:
+    1. Take value from table if present
+    2. Else take from defaults if present
+    3. Else FAIL
+    """
+
+    cfg = {
         "src_db": overrides.get("src_db") or defaults.get("src_db"),
-        "src_sch": overrides.get("src_sch") or defaults["src_sch"]),
-        "tgt_db": overrides.get("tgt_db") or defaults["tgt_db"]),
-        "tgt_sch": overrides.get("tgt_sch") or defaults["tgt_sch"]),
+        "src_sch": overrides.get("src_sch") or defaults.get("src_sch"),
+        "tgt_db": overrides.get("tgt_db") or defaults.get("tgt_db"),
+        "tgt_sch": overrides.get("tgt_sch") or defaults.get("tgt_sch"),
     }
 
+    missing = [k for k, v in cfg.items() if not v]
+    if missing:
+        raise ValueError(
+            f"Table '{table_name}' is missing required config: {missing}"
+        )
+
+    return cfg
+
 # ----------------------------------------------------
-# Connection 1 → Metadata INSERT / DELETE
+# Snowflake connections
 # ----------------------------------------------------
 meta_conn = snowflake.connector.connect(
     account=os.getenv("SNOWFLAKE_ACCOUNT"),
@@ -52,9 +72,6 @@ meta_conn = snowflake.connector.connect(
 )
 meta_cursor = meta_conn.cursor()
 
-# ----------------------------------------------------
-# Connection 2 → Stored Procedure execution
-# ----------------------------------------------------
 proc_conn = snowflake.connector.connect(
     account=os.getenv("SNOWFLAKE_ACCOUNT"),
     user=os.getenv("SNOWFLAKE_USER"),
@@ -83,11 +100,11 @@ for file in files_to_process:
         continue
 
     data = yaml.safe_load(new_content)
-    defaults = data["defaults"]
-    tables = data["tables"]
+    defaults = data.get("defaults", {})   # 🔑 DEFAULTS OPTIONAL
+    tables = data.get("tables", {})
 
     for table in added_tables:
-        cfg = resolve(defaults, tables.get(table, {}))
+        cfg = resolve(defaults, tables.get(table, {}), table)
 
         src_db = cfg["src_db"]
         src_sch = cfg["src_sch"]
@@ -105,7 +122,7 @@ for file in files_to_process:
                  '{tgt_db}', '{tgt_sch}')
             """)
 
-            print("  Calling procedure")
+            print("  Creating secure view")
 
             proc_cursor.execute(f"""
                 CALL TEST_DB.TEST_SCH.CREATE_SECURE_VIEW_PROC(
@@ -117,11 +134,11 @@ for file in files_to_process:
                 )
             """)
 
-            print("   View created successfully")
+            print("  ✅ View created successfully")
 
         except Exception as e:
-            print(f"   View creation failed: {e}")
-            print("  Deleting metadata")
+            print(f"  ❌ View creation failed: {e}")
+            print("  Rolling back metadata")
 
             meta_cursor.execute(f"""
                 DELETE FROM TEST_DB.TEST_SCH.MAP_RAW
@@ -131,7 +148,6 @@ for file in files_to_process:
                   AND TGT_DB = '{tgt_db}'
                   AND TGT_SCH = '{tgt_sch}'
             """)
-
             raise
 
 # ----------------------------------------------------
@@ -142,4 +158,4 @@ meta_conn.close()
 proc_cursor.close()
 proc_conn.close()
 
-print("\nSnowflake view automation completed.")
+print("\nSnowflake view automation completed successfully.")
