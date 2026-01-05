@@ -33,10 +33,10 @@ def get_old_content(file):
 
 def resolve(defaults, overrides):
     return {
-        "src_db": overrides.get("src_db", defaults["src_db"]),
-        "src_sch": overrides.get("src_sch", defaults["src_sch"]),
-        "tgt_db": overrides.get("tgt_db", defaults["tgt_db"]),
-        "tgt_sch": overrides.get("tgt_sch", defaults["tgt_sch"]),
+        "src_db": overrides.get("src_db") or defaults.get("src_db"),
+        "src_sch": overrides.get("src_sch") or defaults["src_sch"]),
+        "tgt_db": overrides.get("tgt_db") or defaults["tgt_db"]),
+        "tgt_sch": overrides.get("tgt_sch") or defaults["tgt_sch"]),
     }
 
 # ----------------------------------------------------
