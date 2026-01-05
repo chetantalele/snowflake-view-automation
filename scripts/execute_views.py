@@ -19,9 +19,6 @@ GIT_BEFORE = os.getenv("GIT_BEFORE")
 # Helper functions
 # ------------------------------------------------------------------
 def load_tables_from_content(content: str) -> set:
-    """
-    Extract table names from YAML content.
-    """
     if not content:
         return set()
 
@@ -35,10 +32,6 @@ def load_tables_from_content(content: str) -> set:
 
 
 def get_old_file_content(file_path: str) -> str:
-    """
-    Get file content from previous commit.
-    If file did not exist before, return empty string.
-    """
     if not GIT_BEFORE or GIT_BEFORE == "0000000000000000000000000000000000000000":
         return ""
 
@@ -52,9 +45,6 @@ def get_old_file_content(file_path: str) -> str:
 
 
 def resolve_config(defaults: dict, overrides: dict) -> dict:
-    """
-    Merge defaults with per-table overrides.
-    """
     return {
         "src_db": overrides.get("src_db", defaults["src_db"]),
         "src_sch": overrides.get("src_sch", defaults["src_sch"]),
@@ -97,7 +87,6 @@ for file in files_to_process:
         continue
 
     data = yaml.safe_load(new_content)
-
     defaults = data["defaults"]
     tables_cfg = data["tables"]
 
@@ -112,7 +101,7 @@ for file in files_to_process:
         tgt_db = cfg["tgt_db"]
         tgt_sch = cfg["tgt_sch"]
 
-        # Safety check using metadata table
+        # Check if metadata already exists
         cursor.execute(f"""
             SELECT COUNT(*)
             FROM TEST_DB.TEST_SCH.MAP_RAW
@@ -125,8 +114,15 @@ for file in files_to_process:
 
         exists = cursor.fetchone()[0]
 
-        if exists == 0:
-            print(f"    Creating secure view for {table_name}")
+        if exists > 0:
+            print("    Metadata already exists. Skipping.")
+            continue
+
+        # -------------------------
+        # INSERT → TRY CREATE → DELETE ON FAILURE
+        # -------------------------
+        try:
+            print("    Inserting metadata")
 
             cursor.execute(f"""
                 INSERT INTO TEST_DB.TEST_SCH.MAP_RAW
@@ -135,6 +131,8 @@ for file in files_to_process:
                 ('{src_db}', '{src_sch}', '{table_name}',
                  '{tgt_db}', '{tgt_sch}')
             """)
+
+            print("    Attempting to create secure view")
 
             cursor.execute(f"""
                 CALL TEST_DB.TEST_SCH.CREATE_SECURE_VIEW_PROC(
@@ -145,8 +143,24 @@ for file in files_to_process:
                     '{tgt_sch}'
                 )
             """)
-        else:
-            print("    Mapping already exists. Skipping.")
+
+            print("    ✅ View created successfully")
+
+        except Exception as e:
+            print(f"    ❌ View creation failed: {e}")
+            print("    Rolling back metadata entry")
+
+            cursor.execute(f"""
+                DELETE FROM TEST_DB.TEST_SCH.MAP_RAW
+                WHERE SRC_DB = '{src_db}'
+                  AND SRC_SCH = '{src_sch}'
+                  AND SRC_TABLE = '{table_name}'
+                  AND TGT_DB = '{tgt_db}'
+                  AND TGT_SCH = '{tgt_sch}'
+            """)
+
+            # Stop pipeline so error is visible in GitHub Actions
+            raise
 
 # ------------------------------------------------------------------
 # Cleanup
