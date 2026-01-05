@@ -7,8 +7,7 @@ defaults:
 tables:
   ORDERS_DATA_1:
     tgt_db: TEST_DB
-  ORDERS_DATA_2:
-    tgt_db: TEST_DB
+
 
  
 
