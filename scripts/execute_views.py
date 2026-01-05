@@ -117,10 +117,10 @@ for file in files_to_process:
                 )
             """)
 
-            print("  ✅ View created successfully")
+            print("   View created successfully")
 
         except Exception as e:
-            print(f"  ❌ View creation failed: {e}")
+            print(f"   View creation failed: {e}")
             print("  Deleting metadata")
 
             meta_cursor.execute(f"""
