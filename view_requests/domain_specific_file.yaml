@@ -7,4 +7,4 @@ defaults:
 tables:
   ORDERS_DATA: {}
   ORDERS: {}
-
+  ORDERS_DATA_3: {}
