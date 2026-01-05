@@ -4,7 +4,8 @@ defaults:
 
 tables:
   ORDERS_DATA_1:
-    tgt_db: TEST_DB
+    src_sch: RAW
+    tgt_sch: TEST_SCH
 
   ORDERS_DATA_2:
     src_sch: RAW
