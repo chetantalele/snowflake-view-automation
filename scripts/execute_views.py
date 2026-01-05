@@ -32,7 +32,7 @@ def load_tables_from_content(content: str) -> set:
 
 
 def get_old_file_content(file_path: str) -> str:
-    if not GIT_BEFORE or GIT_BEFORE == "0000000000000000000000000000000000000000":
+    if not GIT_BEFORE or GIT_BEFORE.startswith("000000"):
         return ""
 
     try:
@@ -53,7 +53,7 @@ def resolve_config(defaults: dict, overrides: dict) -> dict:
     }
 
 # ------------------------------------------------------------------
-# Snowflake connection
+# Snowflake connection (AUTOCOMMIT DISABLED)
 # ------------------------------------------------------------------
 conn = snowflake.connector.connect(
     account=os.getenv("SNOWFLAKE_ACCOUNT"),
@@ -61,7 +61,8 @@ conn = snowflake.connector.connect(
     password=os.getenv("SNOWFLAKE_PASSWORD"),
     role=os.getenv("SNOWFLAKE_ROLE"),
     warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-    database=os.getenv("SNOWFLAKE_DATABASE")
+    database=os.getenv("SNOWFLAKE_DATABASE"),
+    autocommit=False          # 🔴 CRITICAL FIX
 )
 
 cursor = conn.cursor()
@@ -69,103 +70,77 @@ cursor = conn.cursor()
 # ------------------------------------------------------------------
 # Main processing loop
 # ------------------------------------------------------------------
-for file in files_to_process:
-    print(f"\nProcessing file: {file}")
+try:
+    for file in files_to_process:
+        print(f"\nProcessing file: {file}")
 
-    with open(file) as f:
-        new_content = f.read()
+        with open(file) as f:
+            new_content = f.read()
 
-    old_content = get_old_file_content(file)
+        old_content = get_old_file_content(file)
 
-    new_tables = load_tables_from_content(new_content)
-    old_tables = load_tables_from_content(old_content)
+        new_tables = load_tables_from_content(new_content)
+        old_tables = load_tables_from_content(old_content)
 
-    added_tables = new_tables - old_tables
+        added_tables = new_tables - old_tables
 
-    if not added_tables:
-        print("  No newly added tables in this file.")
-        continue
-
-    data = yaml.safe_load(new_content)
-    defaults = data["defaults"]
-    tables_cfg = data["tables"]
-
-    for table_name in added_tables:
-        print(f"  → New table detected: {table_name}")
-
-        table_overrides = tables_cfg.get(table_name, {})
-        cfg = resolve_config(defaults, table_overrides)
-
-        src_db = cfg["src_db"]
-        src_sch = cfg["src_sch"]
-        tgt_db = cfg["tgt_db"]
-        tgt_sch = cfg["tgt_sch"]
-
-        # Check if metadata already exists
-        cursor.execute(f"""
-            SELECT COUNT(*)
-            FROM TEST_DB.TEST_SCH.MAP_RAW
-            WHERE SRC_DB = '{src_db}'
-              AND SRC_SCH = '{src_sch}'
-              AND SRC_TABLE = '{table_name}'
-              AND TGT_DB = '{tgt_db}'
-              AND TGT_SCH = '{tgt_sch}'
-        """)
-
-        exists = cursor.fetchone()[0]
-
-        if exists > 0:
-            print("    Metadata already exists. Skipping.")
+        if not added_tables:
+            print("  No newly added tables in this file.")
             continue
 
-        # -------------------------
-        # INSERT → TRY CREATE → DELETE ON FAILURE
-        # -------------------------
-        try:
-            print("    Inserting metadata")
+        data = yaml.safe_load(new_content)
+        defaults = data["defaults"]
+        tables_cfg = data["tables"]
 
-            cursor.execute(f"""
-                INSERT INTO TEST_DB.TEST_SCH.MAP_RAW
-                (SRC_DB, SRC_SCH, SRC_TABLE, TGT_DB, TGT_SCH)
-                VALUES
-                ('{src_db}', '{src_sch}', '{table_name}',
-                 '{tgt_db}', '{tgt_sch}')
-            """)
+        for table_name in added_tables:
+            print(f"  → New table detected: {table_name}")
 
-            print("    Attempting to create secure view")
+            cfg = resolve_config(defaults, tables_cfg.get(table_name, {}))
 
-            cursor.execute(f"""
-                CALL TEST_DB.TEST_SCH.CREATE_SECURE_VIEW_PROC(
-                    '{src_db}',
-                    '{src_sch}',
-                    '{table_name}',
-                    '{tgt_db}',
-                    '{tgt_sch}'
-                )
-            """)
+            src_db = cfg["src_db"]
+            src_sch = cfg["src_sch"]
+            tgt_db = cfg["tgt_db"]
+            tgt_sch = cfg["tgt_sch"]
 
-            print("    ✅ View created successfully")
+            try:
+                print("    Inserting metadata")
 
-        except Exception as e:
-            print(f"    ❌ View creation failed: {e}")
-            print("    Rolling back metadata entry")
+                cursor.execute(f"""
+                    INSERT INTO TEST_DB.TEST_SCH.MAP_RAW
+                    (SRC_DB, SRC_SCH, SRC_TABLE, TGT_DB, TGT_SCH)
+                    VALUES
+                    ('{src_db}', '{src_sch}', '{table_name}',
+                     '{tgt_db}', '{tgt_sch}')
+                """)
 
-            cursor.execute(f"""
-                DELETE FROM TEST_DB.TEST_SCH.MAP_RAW
-                WHERE SRC_DB = '{src_db}'
-                  AND SRC_SCH = '{src_sch}'
-                  AND SRC_TABLE = '{table_name}'
-                  AND TGT_DB = '{tgt_db}'
-                  AND TGT_SCH = '{tgt_sch}'
-            """)
+                print("    Creating secure view")
 
-            # Stop pipeline so error is visible in GitHub Actions
-            raise
+                cursor.execute(f"""
+                    CALL TEST_DB.TEST_SCH.CREATE_SECURE_VIEW_PROC(
+                        '{src_db}',
+                        '{src_sch}',
+                        '{table_name}',
+                        '{tgt_db}',
+                        '{tgt_sch}'
+                    )
+                """)
 
-# ------------------------------------------------------------------
-# Cleanup
-# ------------------------------------------------------------------
-cursor.close()
-conn.close()
+                #  Commit only if everything succeeded
+                conn.commit()
+                print("    ✅ View created and metadata committed")
+
+            except Exception as e:
+                print(f"    ❌ Failed: {e}")
+                print("    Rolling back transaction")
+
+                #  This removes inserted metadata safely
+                conn.rollback()
+
+                # Fail pipeline so error is visible
+                raise
+
+finally:
+    cursor.close()
+    conn.close()
 
 print("\nSnowflake view automation completed successfully.")
