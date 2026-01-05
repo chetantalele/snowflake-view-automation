@@ -1,12 +1,13 @@
 defaults:
   src_db: SOURCE_DB
-  src_sch: RAW
-  tgt_db: TEST4_DB
-  tgt_sch: TEST_SCH
+  tgt_db: TEST_DB
 
 tables:
   ORDERS_DATA_1:
     tgt_db: TEST_DB
+  ORDERS_DATA_2:
+    src_sch: RAW
+    tgt_sch: TEST_SCH
 
 
  
